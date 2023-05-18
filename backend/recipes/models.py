@@ -1,26 +1,6 @@
 from django.core import validators
 from django.db import models
-
 from users.models import User
-
-
-class Ingredient(models.Model):
-    name = models.CharField(
-        max_length=150,
-        verbose_name='Название ингредиента'
-    )
-    measurement_unit = models.CharField(
-        max_length=20,
-        verbose_name='Единица измерения'
-    )
-
-    class Meta:
-        verbose_name = 'Ингредиент'
-        verbose_name_plural = 'Ингредиенты'
-        ordering = ['name']
-
-    def __str__(self):
-        return self.name
 
 
 class Tag(models.Model):
@@ -42,6 +22,25 @@ class Tag(models.Model):
     class Meta:
         verbose_name = 'Тег'
         verbose_name_plural = 'Теги'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class Ingredient(models.Model):
+    name = models.CharField(
+        max_length=150,
+        verbose_name='Название ингредиента'
+    )
+    measurement_unit = models.CharField(
+        max_length=20,
+        verbose_name='Единица измерения'
+    )
+
+    class Meta:
+        verbose_name = 'Ингредиент'
+        verbose_name_plural = 'Ингредиенты'
         ordering = ['name']
 
     def __str__(self):
@@ -144,6 +143,7 @@ class FavoriteRecipe(models.Model):
     class Meta:
         verbose_name = 'Избранный рецепт'
         verbose_name_plural = 'Избранные рецепты'
+        default_related_name = 'favorites'
 
     def __str__(self):
         return self.user.username
@@ -165,6 +165,7 @@ class ShoppingList(models.Model):
     class Meta:
         verbose_name = 'Список покупкок'
         verbose_name_plural = 'Списки покупок'
+        default_related_name = 'shopping_list'
         ordering = ['user']
         constraints = [
             models.UniqueConstraint(

@@ -28,12 +28,12 @@ class TagAdmin(admin.ModelAdmin):
 class RecipeAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'author')
     list_filter = ('name', 'author', 'tags')
-    readonly_fields = ('added_to_favorites',)
+    readonly_fields = ('in_favorites',)
     search_fields = ('name',)
     empty_value_display = '-пусто-'
 
-    def added_to_favorites(self, instance):
-        return instance.selected_recipe.count()
+    def in_favorites(self, instance):
+        return instance.favorites.count()
 
 
 class FavoriteRecipeAdmin(admin.ModelAdmin):
