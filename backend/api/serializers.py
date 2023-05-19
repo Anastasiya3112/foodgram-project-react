@@ -1,9 +1,10 @@
 from django.contrib.auth import authenticate
 from drf_extra_fields.fields import Base64ImageField
-from recipes.models import (AmountIngredient, FavoriteRecipe, Ingredient,
-                            Recipe, ShoppingList, Tag)
 from rest_framework import serializers
 from rest_framework.fields import SerializerMethodField
+
+from recipes.models import (AmountIngredient, FavoriteRecipe, Ingredient,
+                            Recipe, ShoppingList, Tag)
 from users.models import User
 
 
@@ -18,7 +19,7 @@ class IngredientSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Ingredient
-        fields = ('id', 'name', 'measurement_unit', )
+        fields = ('id', 'name', 'measurement_unit')
 
 
 class RecipeSmallSerializer(serializers.ModelSerializer):
@@ -113,7 +114,7 @@ class AmountsIngredientSerializer(serializers.ModelSerializer):
 
 class RecipeSerializer(serializers.ModelSerializer):
 
-    tags = TagSerializer(read_only=False, many=True)
+    tags = TagSerializer(read_only=True, many=True)
     author = UserSerializer(read_only=True, many=False)
     ingredients = AmountsIngredientSerializer(
         many=True,
@@ -129,17 +130,13 @@ class RecipeSerializer(serializers.ModelSerializer):
                   'name', 'image', 'text', 'cooking_time',
                   )
 
-    def get_ingredients(self, obj):
-        ingredients = AmountIngredient.objects.filter(recipe=obj)
-        return AmountsIngredientSerializer(ingredients, many=True).data
-
     def get_is_favorited(self, obj):
-        request = self.context.get('request')
+        request = self.context['request']
         return request.user.is_authenticated and obj.favorites.filter(
             user=request.user).exists()
 
     def get_is_in_shopping_list(self, obj):
-        request = self.context.get('request')
+        request = self.context['request']
         return request.user.is_authenticated and obj.shopping_list.filter(
             user=request.user).exists()
 
@@ -178,7 +175,7 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         for ingredient in ingredients:
             if ingredient['id'] in ingredients_list:
                 raise serializers.ValidationError(
-                    'Ингридиенты должны быть уникальны')
+                    'Ингредиенты должны быть уникальны')
             ingredients_list.append(ingredient['id'])
             if int(ingredient.get('amount')) < 1:
                 raise serializers.ValidationError(
@@ -200,7 +197,6 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         self.create_ingredients(recipe, ingredients)
         return recipe
 
-    @staticmethod
     def create_ingredients(recipe, ingredients):
         ingredient_list = []
         for ingredient in ingredients:

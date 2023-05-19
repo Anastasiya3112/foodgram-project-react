@@ -1,5 +1,6 @@
 from django.core import validators
 from django.db import models
+
 from users.models import User
 
 
@@ -144,6 +145,13 @@ class FavoriteRecipe(models.Model):
         verbose_name = 'Избранный рецепт'
         verbose_name_plural = 'Избранные рецепты'
         default_related_name = 'favorites'
+        ordering = ['user']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'recipe'],
+                name='unique_favorite_model'
+            )
+        ]
 
     def __str__(self):
         return self.user.username

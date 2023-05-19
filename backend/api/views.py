@@ -1,16 +1,8 @@
-from api.filters import IngredientFilters, RecipeFilters
-from api.pagination import LimitPageNumberPagination
-from api.permissions import UserPermission
-from api.serializers import (IngredientSerializer, RecipeCreateSerializer,
-                             RecipeSerializer, RecipeSmallSerializer,
-                             TagSerializer, TokenSerializer,
-                             UserFollowSerializer, UserSerializer)
+from django.db.models import Sum
 from django.http.response import HttpResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet as DjoserUserViewSet
-from recipes.models import (AmountIngredient, FavoriteRecipe, Ingredient,
-                            Recipe, ShoppingList, Tag)
 from rest_framework import status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
@@ -18,6 +10,16 @@ from rest_framework.decorators import action
 from rest_framework.permissions import (AllowAny, IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
 from rest_framework.response import Response
+
+from api.filters import IngredientFilters, RecipeFilters
+from api.pagination import LimitPageNumberPagination
+from api.permissions import UserPermission
+from api.serializers import (IngredientSerializer, RecipeCreateSerializer,
+                             RecipeSerializer, RecipeSmallSerializer,
+                             TagSerializer, TokenSerializer,
+                             UserFollowSerializer, UserSerializer)
+from recipes.models import (AmountIngredient, FavoriteRecipe, Ingredient,
+                            Recipe, ShoppingList, Tag)
 from users.models import Follow, User
 
 
@@ -90,6 +92,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 class RecipeViewSet(viewsets.ModelViewSet):
 
     queryset = Recipe.objects.all()
+    serializer_class = RecipeSerializer
     permission_classes = (UserPermission, )
     pagination_class = LimitPageNumberPagination
     filter_backends = (DjangoFilterBackend, )
@@ -122,8 +125,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def shopping_cart(self, request, pk):
         if request.method == 'POST':
             return self.create_method(ShoppingList, request.user, pk)
-        else:
-            return self.delete_method(ShoppingList, request.user, pk)
+        return self.delete_method(ShoppingList, request.user, pk)
 
     @action(methods=('POST', 'DELETE'),
             permission_classes=[IsAuthenticated],
@@ -131,30 +133,23 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def favorite(self, request, pk):
         if request.method == 'POST':
             return self.create_method(FavoriteRecipe, request.user, pk)
-        else:
-            return self.delete_method(FavoriteRecipe, request.user, pk)
+        return self.delete_method(FavoriteRecipe, request.user, pk)
 
     @action(detail=False, methods=['GET'])
     def download_shopping_cart(self, request):
         user = request.user
-        shopping_list = user.shopping_list.all()
-        list = {}
-        for point in shopping_list:
-            recipe = point.recipe
-            ingredients = AmountIngredient.objects.filter(recipe=recipe)
-            for ingredient in ingredients:
-                name = ingredient.ingredient.name
-                measurement_unit = ingredient.ingredient.measurement_unit
-                amount = ingredient.amount
-                if name not in list:
-                    list[name] = {"measurement_unit": measurement_unit,
-                                  "amount": amount}
-                else:
-                    list[name]["amount"] = (list[name]["amount"] + amount)
+        ingredients = AmountIngredient.objects.filter(
+            recipe__shopping_list__user=user
+        ).values(
+            "ingredient__name",
+            "ingredient__measurement_unit"
+        ).annotate(amount_list=Sum("amount"))
         shoppinglist = []
-        for name, data in list.items():
+        for ingredient in ingredients:
             shoppinglist.append(
-                f"{name} - {data['amount']} {data['measurement_unit']}, "
+                f'\n{ingredient["ingredient__name"]} - '
+                f'{ingredient["amount_list"]} '
+                f'{ingredient["ingredient__measurement_unit"]} '
             )
         response = HttpResponse(shoppinglist, content_type='text/plain')
         return response
