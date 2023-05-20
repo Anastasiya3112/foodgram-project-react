@@ -197,23 +197,22 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         self.create_ingredients(recipe, ingredients)
         return recipe
 
-    def create_ingredients(recipe, ingredients):
+    def create_ingredients(self, recipe, ingredients):
         ingredient_list = []
         for ingredient in ingredients:
-            ingredient_list.append(
-                AmountIngredient(
+            AmountIngredient(
                     ingredient=ingredient.pop('id'),
                     amount=ingredient.pop('amount'),
                     recipe=recipe,
                 )
-            )
         AmountIngredient.objects.bulk_create(ingredient_list)
 
     def update(self, instance, validated_data):
         instance.tags.clear()
         AmountIngredient.objects.filter(recipe=instance).delete()
-        instance.tags.set(validated_data.get('tags'))
+        instance.tags.set(validated_data.pop('tags'))
         ingredients = validated_data.pop('ingredients')
+        instance.ingredients.clear()
         self.create_ingredients(instance, ingredients)
         return super().update(instance, validated_data)
 
