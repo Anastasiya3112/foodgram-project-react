@@ -15,7 +15,7 @@
 
 ### Клонировать репозиторий и перейти в него в командной строке:
 * git clone git@github.com:Anastasiya3112/foodgram-project-react.git
-* cd foodgram-project-react
+* cd foodgram-project-react/
 
 ### Переходим в папку с файлом docker-compose.yaml:
 * cd infra/
