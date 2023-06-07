@@ -1,4 +1,3 @@
-from django.db.models import Sum
 from django.http.response import HttpResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -7,13 +6,12 @@ from rest_framework import status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import action
-from rest_framework.permissions import (AllowAny, IsAuthenticated,
-                                        IsAuthenticatedOrReadOnly)
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from api.filters import IngredientFilters, RecipeFilters
+from api.filters import RecipeFilters, IngredientFilters
 from api.pagination import LimitPageNumberPagination
-from api.permissions import UserPermission
+from api.permissions import UserPermission, AutorPermission
 from api.serializers import (IngredientSerializer, RecipeCreateSerializer,
                              RecipeSerializer, RecipeSmallSerializer,
                              TagSerializer, TokenSerializer,
@@ -29,21 +27,25 @@ class UserViewSet(DjoserUserViewSet):
     pagination_class = LimitPageNumberPagination
 
     @action(methods=('POST', 'DELETE'), detail=True)
-    def subscribe(self, request, id):
-        user = self.request.user
-        author = get_object_or_404(User, pk=id)
+    def subscribe(self, request, **kwargs):
+        user = request.user
+        author_id = self.kwargs.get('id')
+        author = get_object_or_404(User, id=author_id)
 
-        if user.is_anonymous:
-            return Response(status=status.HTTP_401_UNAUTHORIZED)
-        if self.request.method == 'POST':
-            serializer = UserFollowSerializer(
-                author, data=request.data, context={'request': request}
-            )
+        if request.method == 'POST':
+            serializer = UserFollowSerializer(author,
+                                              data=request.data,
+                                              context={"request": request})
             serializer.is_valid(raise_exception=True)
             Follow.objects.create(user=user, author=author)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        get_object_or_404(Follow, user=user, author=author).delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+
+        if request.method == 'DELETE':
+            subscription = get_object_or_404(Follow,
+                                             user=user,
+                                             author=author)
+            subscription.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(methods=('GET',), detail=False)
     def subscriptions(self, request):
@@ -77,25 +79,25 @@ class TagViewSet(viewsets.ModelViewSet):
 
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly, )
+    permission_classes = (UserPermission, )
+    pagination_class = None
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
+    permission_classes = (UserPermission, )
     filter_backends = (DjangoFilterBackend,)
     filterset_class = IngredientFilters
-    search_fields = ('^name', )
+    pagination_class = None
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
 
     queryset = Recipe.objects.all()
-    serializer_class = RecipeSerializer
-    permission_classes = (UserPermission, )
+    permission_classes = (AutorPermission, )
     pagination_class = LimitPageNumberPagination
-    filter_backends = (DjangoFilterBackend, )
     filterset_class = RecipeFilters
 
     def get_serializer_class(self):
@@ -138,18 +140,24 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['GET'])
     def download_shopping_cart(self, request):
         user = request.user
-        ingredients = AmountIngredient.objects.filter(
-            recipe__shopping_list__user=user
-        ).values(
-            "ingredient__name",
-            "ingredient__measurement_unit"
-        ).annotate(total_amount=Sum("amount"))
+        shopping_list = user.shopping_list.all()
+        data = {}
+        for point in shopping_list:
+            recipe = point.recipe
+            ingredients = AmountIngredient.objects.filter(recipe=recipe)
+            for ingredient in ingredients:
+                name = ingredient.ingredient.name
+                measurement_unit = ingredient.ingredient.measurement_unit
+                amount = ingredient.amount
+                if name not in data:
+                    data[name] = {"measurement_unit": measurement_unit,
+                                  "amount": amount}
+                else:
+                    data[name]["amount"] = (data[name]["amount"] + amount)
         shoppinglist = []
-        for ingredient in ingredients:
+        for name, data in data.items():
             shoppinglist.append(
-                f'\n{ingredient["ingredient__name"]} - '
-                f'{ingredient["total_amount"]} '
-                f'{ingredient["ingredient__measurement_unit"]} '
+                f"{name} - {data['amount']} {data['measurement_unit']},\n"
             )
         response = HttpResponse(shoppinglist, content_type='text/plain')
         return response

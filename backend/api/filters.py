@@ -1,9 +1,9 @@
-from django_filters import rest_framework as filters
+from django_filters.rest_framework import FilterSet, filters
 
-from recipes.models import Ingredient, Recipe
+from recipes.models import Ingredient, Recipe, Tag
 
 
-class IngredientFilters(filters.FilterSet):
+class IngredientFilters(FilterSet):
     name = filters.CharFilter(field_name='name', lookup_expr='icontains')
 
     class Meta:
@@ -11,23 +11,24 @@ class IngredientFilters(filters.FilterSet):
         fields = ('name',)
 
 
-class RecipeFilters(filters.FilterSet):
-    tags = filters.AllValuesMultipleFilter(
+class RecipeFilters(FilterSet):
+    tags = filters.ModelMultipleChoiceFilter(
         field_name='tags__slug',
-        label='tags',
+        to_field_name='slug',
+        queryset=Tag.objects.all(),
     )
     is_favorited = filters.BooleanFilter(
         method='is_favorited_filter',
         label='favorite',
     )
-    is_in_shopping_list = filters.BooleanFilter(
-        method='is_in_shopping_list_filter',
-        label='shoppings_list',
+    is_in_shopping_cart = filters.BooleanFilter(
+        method='is_in_shopping_cart_filter',
+        label='shoppings_cart',
     )
 
     class Meta:
         model = Recipe
-        fields = ('author', 'tags', 'is_favorited', 'is_in_shopping_list')
+        fields = ('author', 'tags', 'is_favorited', 'is_in_shopping_cart')
 
     def is_favorited_filter(self, queryset, name, value):
         if value:
