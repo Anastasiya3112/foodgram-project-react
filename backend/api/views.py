@@ -40,12 +40,12 @@ class UserViewSet(DjoserUserViewSet):
             Follow.objects.create(user=user, author=author)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        if request.method == 'DELETE':
+        elif request.method == 'DELETE':
             subscription = get_object_or_404(Follow,
                                              user=user,
                                              author=author)
             subscription.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(methods=('GET',), detail=False)
     def subscriptions(self, request):
