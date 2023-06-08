@@ -41,9 +41,10 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ('is_subscribed',)
 
     def get_is_subscribed(self, obj):
-        request = self.context['request']
-        return request.user.is_authenticated and obj.following.filter(
-            user=request.user).exists()
+        user = self.context.get('request').user
+        if user.is_anonymous or (user == obj):
+            return False
+        return user.subscribe.filter(id=obj.id).exists()
 
 
 class UserFollowSerializer(UserSerializer):
@@ -156,13 +157,15 @@ class RecipeSerializer(serializers.ModelSerializer):
 
     def get_is_favorited(self, obj):
         request = self.context['request']
-        return request.user.is_authenticated and obj.favorites.filter(
-            user=request.user).exists()
+        if not request or request.user.is_anonymous:
+            return False
+        return FavoriteRecipe.objects.filter(recipe=obj,
+                                             user=request.user).exists()
 
     def get_is_in_shopping_cart(self, obj):
         request = self.context['request']
-        return request.user.is_authenticated and obj.shopping_list.filter(
-            user=request.user).exists()
+        return ShoppingList.objects.filter(recipe=obj,
+                                           user=request.user).exists()
 
 
 class RecipeCreateSerializer(serializers.ModelSerializer):
@@ -217,8 +220,8 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         for ingredient in ingredients:
             ingredient_list.append(
                 AmountIngredient(
-                    ingredient=ingredient.pop('id'),
-                    amount=ingredient.pop('amount'),
+                    ingredient=ingredient['id'],
+                    amount=ingredient['amount'],
                     recipe=recipe,
                 )
             )
