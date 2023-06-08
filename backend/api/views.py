@@ -27,25 +27,20 @@ class UserViewSet(DjoserUserViewSet):
     pagination_class = LimitPageNumberPagination
 
     @action(methods=('POST', 'DELETE'), detail=True)
-    def subscribe(self, request, **kwargs):
+    def subscribe(self, request, id):
         user = request.user
-        author_id = self.kwargs.get('id')
-        author = get_object_or_404(User, id=author_id)
-
-        if request.method == 'POST':
-            serializer = UserFollowSerializer(author,
-                                              data=request.data,
-                                              context={"request": request})
+        author = get_object_or_404(User, pk=id)
+        if user.is_anonymous:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+        if self.request.method == 'POST':
+            serializer = UserFollowSerializer(
+                author, data=request.data, context={'request': request}
+            )
             serializer.is_valid(raise_exception=True)
             Follow.objects.create(user=user, author=author)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        if request.method == 'DELETE':
-            subscription = get_object_or_404(Follow,
-                                             user=user,
-                                             author=author)
-            subscription.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+        get_object_or_404(Follow, user=user, author=author).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(methods=('GET',), detail=False)
     def subscriptions(self, request):
