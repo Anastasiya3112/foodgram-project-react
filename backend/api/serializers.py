@@ -153,15 +153,19 @@ class RecipeSerializer(serializers.ModelSerializer):
                   'name', 'image', 'text', 'cooking_time',
                   )
 
-    def get_is_favorited(self, obj):
-        request = self.context['request']
-        return request.user.is_authenticated and obj.favorites.filter(
-            user=request.user).exists()
+    def get_is_favorited(self, recipe):
+        user = self.context.get('request').user
+        return (
+            user.is_authenticated and FavoriteRecipe.objects.filter(
+                user=user, recipe=recipe).exists()
+        )
 
-    def get_is_in_shopping_cart(self, obj):
-        request = self.context['request']
-        return request.user.is_authenticated and obj.shopping_list.filter(
-            user=request.user).exists()
+    def get_is_in_shopping_cart(self, recipe):
+        user = self.context.get('request').user
+        return (
+            user.is_authenticated
+            and ShoppingList.objects.filter(user=user, recipe=recipe).exists()
+        )
 
 
 class RecipeCreateSerializer(serializers.ModelSerializer):
@@ -229,7 +233,7 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         recipe = Recipe.objects.create(author=request.user, **validated_data)
         recipe.tags.set(tags)
-        self.create_ingredients(recipe, ingredients)
+        self.create_ingredients(ingredients, recipe)
         return recipe
 
     def update(self, instance, validated_data):
@@ -237,7 +241,7 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         instance.ingredients.clear()
         instance.tags.set(validated_data.get('tags'))
         ingredients = validated_data.pop('ingredients')
-        self.create_ingredients(instance, ingredients)
+        self.create_ingredients(ingredients, instance)
         return super().update(instance, validated_data)
 
     def to_representation(self, instance):
