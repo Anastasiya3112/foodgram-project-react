@@ -215,16 +215,11 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         return cooking_time
 
     def create_ingredients(self, ingredients, recipe):
-        ingredient_list = []
         for ingredient in ingredients:
-            ingredient_list.append(
-                AmountIngredient(
-                    ingredient=ingredient['id'],
-                    amount=ingredient['amount'],
-                    recipe=recipe,
-                )
-            )
-        AmountIngredient.objects.bulk_create(ingredient_list)
+            AmountIngredient.objects.create(
+                recipe=recipe,
+                ingredient_id=ingredient.get('id'),
+                amount=ingredient.get('amount'), )
 
     def create(self, validated_data):
         tags = validated_data.pop('tags')
