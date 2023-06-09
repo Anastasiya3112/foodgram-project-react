@@ -1,7 +1,7 @@
 from django_filters.rest_framework import FilterSet, filters
 from rest_framework.filters import SearchFilter
 
-from recipes.models import Ingredient, Recipe, Tag
+from recipes.models import Ingredient, Recipe
 
 
 class IngredientFilters(SearchFilter):
@@ -13,33 +13,45 @@ class IngredientFilters(SearchFilter):
 
 
 class RecipeFilters(FilterSet):
-    tags = filters.ModelMultipleChoiceFilter(
+    tags = filters.CharFilter(
         field_name='tags__slug',
-        to_field_name='slug',
-        queryset=Tag.objects.all(),
+        method='tags_filter'
     )
-    is_favorited = filters.BooleanFilter(
-        method='is_favorited_filter',
-        label='favorite',
+    is_favorited = filters.CharFilter(
+        method='is_favorited_filter'
     )
-    is_in_shopping_list = filters.BooleanFilter(
-        method='is_in_shopping_list_filter',
-        label='shoppings_list',
+    is_in_shopping_cart = filters.CharFilter(
+        method='is_in_shopping_cart_filter'
     )
 
     class Meta:
         model = Recipe
-        fields = ('author', 'tags', 'is_favorited', 'is_in_shopping_list')
+        fields = ('author', 'tags', 'is_favorited', 'is_in_shopping_cart')
 
-    def is_favorited_filter(self, queryset, name, value):
-        if value:
-            return queryset.filter(favorites__user=self.request.user)
-        return queryset.exclude(
-            favorites__user=self.request.user
+    def tags_filter(self, queryset, slug, tags):
+        tags = self.request.query_params.getlist('tags')
+        return queryset.filter(tags__slug__in=tags).distinct()
+
+    def is_favorited_filter(self, queryset, is_favorited, slug):
+        user = self.request.user
+        if not user.is_authenticated:
+            return queryset
+        is_favorited = self.request.query_params.get('is_favorited', )
+        if is_favorited:
+            return queryset.filter(
+                favorites__user=self.request.user
+            ).distinct()
+        return queryset
+
+    def is_in_shopping_list_filter(self, queryset, is_in_shopping_cart, slug):
+        user = self.request.user
+        if not user.is_authenticated:
+            return queryset
+        is_in_shopping_cart = self.request.query_params.get(
+            'is_in_shopping_cart',
         )
-
-    def is_in_shopping_list_filter(self, queryset, name, value):
-        if value:
-            return Recipe.objects.filter(
+        if is_in_shopping_cart:
+            return queryset.filter(
                 shopping_list__user=self.request.user
-            )
+            ).distinct()
+        return queryset
