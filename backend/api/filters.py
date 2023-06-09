@@ -1,6 +1,14 @@
+from distutils.util import strtobool
+
 from django_filters.rest_framework import FilterSet, filters
 
-from recipes.models import Ingredient, Recipe
+from recipes.models import (Ingredient, Recipe, FavoriteRecipe,
+                            ShoppingList, Tag)
+
+CHOICES_LIST = (
+    ('0', 'False'),
+    ('1', 'True')
+)
 
 
 class IngredientFilters(FilterSet):
@@ -12,15 +20,22 @@ class IngredientFilters(FilterSet):
 
 
 class RecipeFilters(FilterSet):
-    tags = filters.AllValuesMultipleFilter(
+    tags = filters.ModelMultipleChoiceFilter(
+        queryset=Tag.objects.all(),
         field_name='tags__slug',
-        label='tags',
+        to_field_name='slug'
     )
-    is_favorited = filters.BooleanFilter(
-        method='is_favorited_filter'
+    author = filters.NumberFilter(
+        field_name='author',
+        lookup_expr='exact'
+    )
+    is_favorited = filters.ChoiceFilter(
+        method='is_favorited_filter',
+        choices=CHOICES_LIST
     )
     is_in_shopping_cart = filters.BooleanFilter(
-        method='is_in_shopping_cart_filter'
+        method='is_in_shopping_cart_filter',
+        choices=CHOICES_LIST
     )
 
     class Meta:
@@ -28,14 +43,27 @@ class RecipeFilters(FilterSet):
         fields = ('author', 'tags', 'is_favorited', 'is_in_shopping_cart')
 
     def is_favorited_filter(self, queryset, name, value):
-        if value:
-            return queryset.filter(in_favorites__user=self.request.user)
-        return queryset.exclude(
-            in_favorites__user=self.request.user
-        )
+        if self.request.user.is_anonymous:
+            return Recipe.objects.none()
+
+        favorite = FavoriteRecipe.objects.filter(user=self.request.user)
+        recipes = [item.recipe.id for item in favorite]
+        new_queryset = queryset.filter(id__in=recipes)
+
+        if not strtobool(value):
+            return queryset.difference(new_queryset)
+
+        return queryset.filter(id__in=recipes)
 
     def is_in_shopping_cart_filter(self, queryset, name, value):
-        if value:
-            return Recipe.objects.filter(
-                shopping_list__user=self.request.user
-            )
+        if self.request.user.is_anonymous:
+            return Recipe.objects.none()
+
+        shopping_list = ShoppingList.objects.filter(user=self.request.user)
+        recipes = [item.recipe.id for item in shopping_list]
+        new_queryset = queryset.filter(id__in=recipes)
+
+        if not strtobool(value):
+            return queryset.difference(new_queryset)
+
+        return queryset.filter(id__in=recipes)
