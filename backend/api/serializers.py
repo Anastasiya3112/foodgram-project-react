@@ -75,7 +75,7 @@ class UserFollowSerializer(UserSerializer):
     def get_recipes(self, obj):
         request = self.context.get('request')
         limit = request.GET.get('recipes_limit')
-        recipes = obj.author.recipes.all()
+        recipes = obj.recipes.all()
         if limit:
             recipes = recipes[: int(limit)]
         serializer = RecipeSmallSerializer(recipes, many=True, read_only=True)
@@ -154,18 +154,14 @@ class RecipeSerializer(serializers.ModelSerializer):
                   )
 
     def get_is_favorited(self, obj):
-        request = self.context.get('request')
-        if not request or request.user.is_anonymous:
-            return False
-        return FavoriteRecipe.objects.filter(recipe=obj,
-                                             user=request.user).exists()
+        request = self.context['request']
+        return request.user.is_authenticated and obj.favorites.filter(
+            user=request.user).exists()
 
-    def get_is_in_shopping_cart(self, obj):
-        request = self.context.get('request')
-        if not request or request.user.is_anonymous:
-            return False
-        return ShoppingList.objects.filter(recipe=obj,
-                                           user=request.user).exists()
+    def get_is_in_shopping_list(self, obj):
+        request = self.context['request']
+        return request.user.is_authenticated and obj.shopping_list.filter(
+            user=request.user).exists()
 
 
 class RecipeCreateSerializer(serializers.ModelSerializer):
