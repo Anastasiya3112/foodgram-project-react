@@ -140,7 +140,8 @@ class RecipeSerializer(serializers.ModelSerializer):
     tags = TagSerializer(read_only=True, many=True)
     author = UserSerializer(read_only=True)
     ingredients = AmountsIngredientSerializer(
-        many=True)
+        many=True,
+        source='recipe')
     image = Base64ImageField()
     is_favorited = serializers.SerializerMethodField()
     is_in_shopping_cart = serializers.SerializerMethodField()
@@ -220,8 +221,8 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
             ingredients_recipe.append(
                 AmountIngredient(
                     recipe=recipe,
-                    ingredient=ingredient['id'],
-                    amount=ingredient['amount']
+                    ingredient=ingredient.get('id'),
+                    amount=ingredient.get('amount')
                 )
             )
         AmountIngredient.objects.bulk_create(ingredients_recipe)
@@ -229,7 +230,7 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         tags = validated_data.pop('tags')
         ingredients = validated_data.pop('ingredients')
-        request = self.context.get('request')
+        request = self.context.get('request', None)
         recipe = Recipe.objects.create(author=request.user, **validated_data)
         recipe.tags.set(tags)
         self.create_ingredients(ingredients, recipe)

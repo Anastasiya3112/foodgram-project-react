@@ -37,7 +37,7 @@ class RecipeFilters(FilterSet):
             favorites__user=self.request.user
         )
 
-    def is_in_shopping_list_filter(self, queryset, name, value):
+    def is_in_shopping_cart_filter(self, queryset, name, value):
         if value:
             return Recipe.objects.filter(
                 shopping_list__user=self.request.user
