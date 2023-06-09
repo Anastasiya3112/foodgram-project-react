@@ -81,7 +81,7 @@ class UserFollowSerializer(UserSerializer):
         serializer = RecipeSmallSerializer(recipes, many=True, read_only=True)
         return serializer.data
 
-    def get_recipes_count(self, obj):
+    def get_count_recipes(self, obj):
         return obj.recipes.count()
 
 
@@ -154,16 +154,14 @@ class RecipeSerializer(serializers.ModelSerializer):
                   )
 
     def get_is_favorited(self, obj):
-        user = self.context['request'].user
-        if user.is_anonymous:
-            return False
-        return FavoriteRecipe.objects.filter(user=user, recipe=obj).exists()
+        request = self.context['request']
+        return request.user.is_authenticated and obj.favorites.filter(
+            user=request.user).exists()
 
     def get_is_in_shopping_list(self, obj):
-        user = self.context['request'].user
-        if user.is_anonymous:
-            return False
-        return ShoppingList.objects.filter(user=user, recipe=obj).exists()
+        request = self.context['request']
+        return request.user.is_authenticated and obj.shopping_list.filter(
+            user=request.user).exists()
 
 
 class RecipeCreateSerializer(serializers.ModelSerializer):
@@ -266,7 +264,7 @@ class FavoriteSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         user = data['user']
-        if user.favorites.filter(recipe__id=data['recipe'].id).exists():
+        if user.favorites.filter(recipe=data['recipe']).exists():
             raise serializers.ValidationError(
                 detail='Рецепт уже есть в избранном.'
             )
@@ -294,7 +292,7 @@ class ShoppingListSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         user = data['user']
-        if user.shopping_list.filter(recipe__id=data['recipe'].id).exists():
+        if user.shopping_list.filter(recipe=data['recipe']).exists():
             raise serializers.ValidationError(
                 detail='Рецепт уже добавлен в корзину.'
             )
