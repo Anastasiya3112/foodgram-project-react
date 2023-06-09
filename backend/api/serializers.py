@@ -75,7 +75,7 @@ class UserFollowSerializer(UserSerializer):
     def get_recipes(self, obj):
         request = self.context.get('request')
         limit = request.GET.get('recipes_limit')
-        recipes = obj.recipes.all()
+        recipes = obj.author.recipes.all()
         if limit:
             recipes = recipes[: int(limit)]
         serializer = RecipeSmallSerializer(recipes, many=True, read_only=True)
