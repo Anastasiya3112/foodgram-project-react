@@ -96,6 +96,14 @@ class RecipeViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filterset_class = RecipeFilters
 
+    def get_queryset(self):
+        queryset = Recipe.objects.all()
+        params = self.request.query_params
+        tag_slug = params.get('tags__slug', None)
+        if tag_slug is not None:
+            queryset = queryset.filter(tags__name=tag_slug)
+        return queryset
+
     def get_serializer_class(self):
         if self.request.method == 'GET':
             return RecipeSerializer
