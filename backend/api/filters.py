@@ -1,40 +1,69 @@
-from django_filters.rest_framework import filters
+from distutils.util import strtobool
 
-from recipes.models import Ingredient
+from django_filters.rest_framework import FilterSet, filters
+
+from recipes.models import (Ingredient, Recipe, FavoriteRecipe,
+                            ShoppingList, Tag)
+
+CHOICES_LIST = (
+    ('0', 'False'),
+    ('1', 'True')
+)
 
 
-class IngredientFilters(filters.SearchFilter):
-    search_param = 'name'
+class IngredientFilters(FilterSet):
+    name = filters.CharFilter(field_name='name', lookup_expr='icontains')
 
     class Meta:
         model = Ingredient
         fields = ('name',)
 
 
-class RecipeFilters(filters.BaseFilterBackend):
-    def filter_queryset(self, request, queryset, view):
-        is_favorited = request.query_params.get('is_favorited')
-        is_in_shopping_cart = request.query_params.get(
-            'is_in_shopping_cart'
-        )
-        recipes_author = request.query_params.get('author')
-        recipes_tags = request.query_params.getlist('tags')
-        new_queryset = queryset
-        if is_favorited == '1':
-            new_queryset = new_queryset.filter(
-                favorites__user=request.user
-            )
-        if is_in_shopping_cart == '1':
-            new_queryset = new_queryset.filter(
-                shopping_list__user=request.user
-            )
-        if recipes_author is not None:
-            new_queryset = new_queryset.filter(
-                author=recipes_author
-            )
-        if recipes_tags:
-            regular_tags = '|'.join(recipes_tags)
-            new_queryset = new_queryset.filter(
-                tags__slug__regex=regular_tags
-            )
-        return new_queryset.distinct()
+class RecipeFilters(FilterSet):
+    tags = filters.ModelMultipleChoiceFilter(
+        queryset=Tag.objects.all(),
+        field_name='tags__slug',
+        to_field_name='slug'
+    )
+    author = filters.NumberFilter(
+        field_name='author',
+        lookup_expr='exact'
+    )
+    is_favorited = filters.ChoiceFilter(
+        method='is_favorited_filter',
+        choices=CHOICES_LIST
+    )
+    is_in_shopping_cart = filters.ChoiceFilter(
+        method='is_in_shopping_cart_filter',
+        choices=CHOICES_LIST
+    )
+
+    class Meta:
+        model = Recipe
+        fields = ('author', 'tags', 'is_favorited', 'is_in_shopping_cart')
+
+    def is_favorited_filter(self, queryset, name, value):
+        if self.request.user.is_anonymous:
+            return Recipe.objects.none()
+
+        favorite = FavoriteRecipe.objects.filter(user=self.request.user)
+        recipes = [item.recipe.id for item in favorite]
+        new_queryset = queryset.filter(id__in=recipes)
+
+        if not strtobool(value):
+            return queryset.difference(new_queryset)
+
+        return queryset.filter(id__in=recipes)
+
+    def is_in_shopping_cart_filter(self, queryset, name, value):
+        if self.request.user.is_anonymous:
+            return Recipe.objects.none()
+
+        shopping_list = ShoppingList.objects.filter(user=self.request.user)
+        recipes = [item.recipe.id for item in shopping_list]
+        new_queryset = queryset.filter(id__in=recipes)
+
+        if not strtobool(value):
+            return queryset.difference(new_queryset)
+
+        return queryset.filter(id__in=recipes)
