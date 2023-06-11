@@ -1,17 +1,9 @@
-from distutils.util import strtobool
+from django_filters import rest_framework as filters
 
-from django_filters.rest_framework import FilterSet, filters
-
-from recipes.models import (Ingredient, Recipe, FavoriteRecipe,
-                            ShoppingList, Tag)
-
-CHOICES_LIST = (
-    ('0', 'False'),
-    ('1', 'True')
-)
+from recipes.models import Ingredient, Recipe
 
 
-class IngredientFilters(FilterSet):
+class IngredientFilters(filters.FilterSet):
     name = filters.CharFilter(field_name='name', lookup_expr='icontains')
 
     class Meta:
@@ -19,51 +11,34 @@ class IngredientFilters(FilterSet):
         fields = ('name',)
 
 
-class RecipeFilters(FilterSet):
-    tags = filters.ModelMultipleChoiceFilter(
-        queryset=Tag.objects.all(),
+class RecipeFilters(filters.FilterSet):
+    tags = filters.AllValuesMultipleFilter(
         field_name='tags__slug',
-        to_field_name='slug'
+        label='tags',
     )
-    author = filters.NumberFilter(
-        field_name='author',
-        lookup_expr='exact'
-    )
-    is_favorited = filters.ChoiceFilter(
+    is_favorited = filters.BooleanFilter(
         method='is_favorited_filter',
-        choices=CHOICES_LIST
+        label='favorite',
     )
-    is_in_shopping_cart = filters.ChoiceFilter(
-        method='is_in_shopping_cart_filter',
-        choices=CHOICES_LIST
+    is_in_shopping_list = filters.BooleanFilter(
+        method='is_in_shopping_list_filter',
+        label='shoppings_list',
     )
 
     class Meta:
         model = Recipe
-        fields = ('author', 'tags', 'is_favorited', 'is_in_shopping_cart')
+        fields = ('author', 'tags', 'is_favorited', 'is_in_shopping_list')
 
     def is_favorited_filter(self, queryset, name, value):
-        if self.request.user.is_anonymous:
-            return Recipe.objects.none()
+        if value and self.request and self.request.user.is_authenticated:
+            return queryset.filter(favorites__user=self.request.user)
+        return queryset.exclude(
+            favorites__user=self.request.user
+        )
 
-        favorite = FavoriteRecipe.objects.filter(user=self.request.user)
-        recipes = [item.recipe.id for item in favorite]
-        new_queryset = queryset.filter(id__in=recipes)
-
-        if not strtobool(value):
-            return queryset.difference(new_queryset)
-
-        return queryset.filter(id__in=recipes)
-
-    def is_in_shopping_cart_filter(self, queryset, name, value):
-        if self.request.user.is_anonymous:
-            return Recipe.objects.none()
-
-        shopping_list = ShoppingList.objects.filter(user=self.request.user)
-        recipes = [item.recipe.id for item in shopping_list]
-        new_queryset = queryset.filter(id__in=recipes)
-
-        if not strtobool(value):
-            return queryset.difference(new_queryset)
-
-        return queryset.filter(id__in=recipes)
+    def is_in_shopping_list_filter(self, queryset, name, value):
+        if value and self.request and self.request.user.is_authenticated:
+            return Recipe.objects.filter(
+                shopping_list__user=self.request.user
+            )
+        return queryset
