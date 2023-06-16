@@ -2,13 +2,12 @@ from django.http.response import HttpResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet as DjoserUserViewSet
-from rest_framework import status, viewsets, generics
+from rest_framework import status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
 
 from api.filters import RecipeFilters, IngredientFilters
 from api.pagination import LimitPageNumberPagination
@@ -16,8 +15,7 @@ from api.permissions import UserPermission
 from api.serializers import (IngredientSerializer, RecipeCreateSerializer,
                              RecipeSerializer, RecipeSmallSerializer,
                              TagSerializer, TokenSerializer,
-                             UserFollowSerializer, UserSerializer,
-                             FavoriteSerializer)
+                             UserFollowSerializer, UserSerializer)
 from recipes.models import (AmountIngredient, FavoriteRecipe, Ingredient,
                             Recipe, ShoppingList, Tag)
 from users.models import Follow, User
@@ -30,7 +28,7 @@ class UserViewSet(DjoserUserViewSet):
 
     @action(methods=('POST', 'DELETE'), detail=True)
     def subscribe(self, request, id):
-        user = request.user
+        user = request.user  # user = self.request.user
         author = get_object_or_404(User, pk=id)
         if user.is_anonymous:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
@@ -157,35 +155,3 @@ class RecipeViewSet(viewsets.ModelViewSet):
             )
         response = HttpResponse(shoppinglist, content_type='text/plain')
         return response
-
-
-class FavoriteCreateAPIView(generics.CreateAPIView):
-    serializer_class = FavoriteSerializer
-    permission_classes = [IsAuthenticated, ]
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(user=request.user)
-            return Response(
-                serializer.validated_data,
-                status=status.HTTP_201_CREATED
-            )
-        raise ValidationError(serializer.errors)
-
-
-class FavoriteDeleteAPIView(generics.DestroyAPIView):
-    queryset = FavoriteRecipe.objects.all()
-    permission_classes = [IsAuthenticated, ]
-    serializer_class = FavoriteSerializer
-
-    def delete(self, request, *args, **kwargs):
-        try:
-            instance = self.get_object()
-            self.check_object_permissions(request, instance)
-            self.perform_destroy(instance)
-            return Response(
-                {'success': True}, status=status.HTTP_204_NO_CONTENT
-            )
-        except Exception:
-            raise ValidationError('Не удалось удалить избранный рецепт')
