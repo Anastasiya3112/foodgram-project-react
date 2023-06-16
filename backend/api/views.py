@@ -1,3 +1,4 @@
+from django.db.models import Sum
 from django.http.response import HttpResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -134,24 +135,18 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['GET'])
     def download_shopping_cart(self, request):
         user = request.user
-        shopping_list = user.shopping_list.all()
-        data = {}
-        for point in shopping_list:
-            recipe = point.recipe
-            ingredients = AmountIngredient.objects.filter(recipe=recipe)
-            for ingredient in ingredients:
-                name = ingredient.ingredient.name
-                measurement_unit = ingredient.ingredient.measurement_unit
-                amount = ingredient.amount
-                if name not in data:
-                    data[name] = {"measurement_unit": measurement_unit,
-                                  "amount": amount}
-                else:
-                    data[name]["amount"] = (data[name]["amount"] + amount)
+        ingredients = AmountIngredient.objects.filter(
+            recipe__shopping_list__user=user
+        ).values(
+            "ingredient__name",
+            "ingredient__measurement_unit"
+        ).annotate(total_amount=Sum("amount"))
         shoppinglist = []
-        for name, data in data.items():
+        for ingredient in ingredients:
             shoppinglist.append(
-                f"{name} - {data['amount']} {data['measurement_unit']},\n"
+                f'\n{ingredient["ingredient__name"]} - '
+                f'{ingredient["total_amount"]} '
+                f'{ingredient["ingredient__measurement_unit"]} '
             )
         response = HttpResponse(shoppinglist, content_type='text/plain')
         return response
