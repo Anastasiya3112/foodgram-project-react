@@ -81,7 +81,7 @@ class UserFollowSerializer(UserSerializer):
         serializer = RecipeSmallSerializer(recipes, many=True, read_only=True)
         return serializer.data
 
-    def get_count_recipes(self, obj):
+    def get_recipes_count(self, obj):
         return obj.recipes.count()
 
 
